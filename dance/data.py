@@ -49,7 +49,7 @@ class Data:
 
     @property
     def url(self) -> str:
-        return f"https://github.com/antolonappan/dance/releases/download/1.0/{self.filename}"
+        return f"https://github.com/antolonappan/dance/releases/download/v0.1-pre/{self.filename}"
     
     
 
@@ -82,3 +82,4 @@ class Data:
 GAL_MASK = Data("binary_GAL_mask_N1024.fits")
 CAMB_INI = Data('cb.ini')
 SPECTRA = Data('spectra.pkl')
+PICO = Data('pico.pkl')
