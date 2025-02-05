@@ -31,9 +31,7 @@ class CMB:
 
         self.nside  = nside
         self.lmax   = 3 * nside - 1
-        
-        self.__set_power__()
-        
+
         self.beta   = beta
         self.Acb    = Acb
         assert model in ["iso","aniso"], "model should be 'iso' or 'aniso'"
@@ -47,6 +45,7 @@ class CMB:
 
         self.__set_workspace__()
         self.__set_seeds__()
+        self.__set_power__()
         self.verbose = verbose if verbose is not None else False
    
     def __set_seeds__(self) -> None:
@@ -62,7 +61,6 @@ class CMB:
         """
         Set the workspace for the CMB simulations.
         """
-        lens = "lensed" if self.lensing else "gaussian"
         if self.model == "iso":
             model = f"iso_beta_{str(self.beta).replace('.','p')}"
         elif self.model == "aniso":
@@ -71,13 +69,15 @@ class CMB:
             raise ValueError("Model not implemented yet, only 'iso' and 'aniso' are supported")
 
 
-        self.cmbdir = os.path.join(self.basedir, 'CMB', lens, model, 'cmb')
-        os.makedirs(self.cmbdir, exist_ok=True)
-        self.phidir = os.path.join(self.basedir, 'CMB', lens, model, 'phi')
-        os.makedirs(self.phidir, exist_ok=True)
+        self.cmbdir = os.path.join(self.basedir, 'CMB', model, 'cmb')
+        self.phidir = os.path.join(self.basedir, 'CMB', model, 'phi')
+        if mpi.rank == 0:
+            os.makedirs(self.cmbdir, exist_ok=True)
+            os.makedirs(self.phidir, exist_ok=True)
         if self.model == "aniso":
-            self.alphadir = os.path.join(self.basedir, 'CMB', lens, model, 'alpha')
-            os.makedirs(self.alphadir, exist_ok=True)
+            self.alphadir = os.path.join(self.basedir, 'CMB', model, 'alpha')
+            if mpi.rank == 0:
+                os.makedirs(self.alphadir, exist_ok=True)
         
     def compute_powers(self) -> Dict[str, Any]:
         """
@@ -371,6 +371,7 @@ class CMB:
                     beta=self.beta if self.beta is not None else 0.0,
                     dl=False,
                 )
+            np.random.seed(self.__cseeds__[idx])
             alms = hp.synalm(
                 [spectra["tt"], spectra["ee"], spectra["bb"], spectra["te"], spectra["eb"], spectra["tb"]],
                 lmax=self.lmax,
@@ -392,20 +393,22 @@ class CMB:
         else:
             spectra = self.get_unlensed_spectra(dl=False)
             np.random.seed(self.__cseeds__[idx])
-            alms = hp.synalm(
+            Q,U = hp.synfast(
                 [spectra["tt"], spectra["ee"], spectra["bb"], spectra["te"]],
-                lmax=self.lmax,
+                nside=self.nside,
                 new=True,
-            )
-            defl = self.grad_phi_alm(idx)
-            geom_info = ('healpix', {'nside':self.nside})
-            Q, U = lenspyx.alm2lenmap_spin([alms[1],alms[2]], defl, 2, geometry=geom_info, verbose=int(self.verbose))
+            )[1:]
             alpha = self.alpha_map(idx)
             rQ = Q * np.cos(2 * alpha) - U * np.sin(2 * alpha)
             rU = Q * np.sin(2 * alpha) + U * np.cos(2 * alpha)
-            del (Q, U)
-            hp.write_map(fname, [rQ, rU], dtype=np.float64)
-            return [rQ, rU]
+            del (Q, U, alpha)
+            elm, blm = hp.map2alm_spin([rQ, rU], 2)
+            defl = self.grad_phi_alm(idx)
+            geom_info = ('healpix', {'nside':self.nside})
+            Q, U = lenspyx.alm2lenmap_spin([elm,blm], defl, 2, geometry=geom_info, verbose=int(self.verbose))
+            del (elm, blm, defl)
+            hp.write_map(fname, [Q, U], dtype=np.float64)
+            return [Q, U]
         
     def get_QU(self, idx: int) -> List[np.ndarray]:
         if self.model == "iso":
@@ -414,3 +417,7 @@ class CMB:
             return self.get_aniso_lensed_QU(idx)
         else:
             raise ValueError("Model not implemented yet, only 'iso' and 'aniso' are supported")
+    
+    def get_EB(self, idx: int) -> np.ndarray:
+        QU = self.get_QU(idx)
+        return hp.map2alm_spin(QU, 2)

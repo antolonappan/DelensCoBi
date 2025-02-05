@@ -55,15 +55,14 @@ class Data:
 
     def __load__(self, fname: str) -> Any:
         ext = fname.split('.')[-1]
-        match ext:
-            case 'fits':  
-                return read_map(fname, field=self._galcut) # type: ignore
-            case 'pkl':
-                return load(open(fname, 'rb'))
-            case 'ini':
-                return read_ini(fname)
-            case _:
-                raise ValueError(f'Unknown file extension: {ext}')
+        if ext == 'fits':
+            return read_map(fname, field=self._galcut) # type: ignore
+        elif ext == 'pkl':
+            return load(open(fname, 'rb'))
+        elif ext == 'ini':
+            return read_ini(fname)
+        else:
+            raise ValueError(f'Unknown file extension: {ext}')
 
     @property
     def data(self) -> Any:
