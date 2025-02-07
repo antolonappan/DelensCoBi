@@ -25,6 +25,7 @@ class CMB:
         beta: Optional[float]=None,
         Acb: Optional[float]=None,
         verbose: Optional[bool] = True,
+        cache: Optional[bool] = False,
     ):
         self.logger = Logger(self.__class__.__name__, verbose=verbose if verbose is not None else False)
         self.basedir = libdir
@@ -47,6 +48,7 @@ class CMB:
         self.__set_seeds__()
         self.__set_power__()
         self.verbose = verbose if verbose is not None else False
+        self.cache = cache if cache is not None else False
    
     def __set_seeds__(self) -> None:
         """
@@ -337,7 +339,8 @@ class CMB:
             np.random.seed(self.__aseeds__[idx])
             alm = hp.synalm(cl_aa, lmax=self.lmax,new=True)
             alpha = hp.alm2map(alm, self.nside)
-            hp.write_map(fname, alpha, dtype=np.float64)
+            if self.cache:
+                hp.write_map(fname, alpha, dtype=np.float64)
             return alpha # type: ignore
     
     def cl_pp(self):
@@ -346,13 +349,14 @@ class CMB:
 
     def phi_alm(self, idx: int) -> np.ndarray:
         fname = os.path.join(self.phidir, f"phi_Lmax{self.lmax}_{idx:03d}.fits")
-        if os.path.isfile(fname):
+        if os.path.isfile(fname) and self.cache:
             return hp.read_alm(fname)
         else:
             cl_pp = self.cl_pp()
             np.random.seed(self.__pseeds__[idx])
             alm = hp.synalm(cl_pp, lmax=self.lmax, new=True)
-            hp.write_alm(fname, alm)
+            if self.cache:
+                hp.write_alm(fname, alm)
             return alm
         
     def grad_phi_alm(self, idx: int) -> np.ndarray:
@@ -364,7 +368,7 @@ class CMB:
             self.cmbdir,
             f"sims_nside{self.nside}_{idx:03d}.fits",
         )
-        if os.path.isfile(fname):
+        if os.path.isfile(fname) and self.cache:
             return hp.read_map(fname, field=[0, 1])
         else:
             spectra = self.get_cb_unlensed_spectra(
@@ -380,7 +384,8 @@ class CMB:
             defl = self.grad_phi_alm(idx)
             geom_info = ('healpix', {'nside':self.nside})
             Qlen, Ulen = lenspyx.alm2lenmap_spin([alms[1],alms[2]], defl, 2, geometry=geom_info, verbose=int(self.verbose))
-            hp.write_map(fname, [Qlen, Ulen], dtype=np.float64)
+            if self.cache:
+                hp.write_map(fname, [Qlen, Ulen], dtype=np.float64)
             return [Qlen, Ulen]
     
     def get_aniso_lensed_QU(self, idx: int) -> List[np.ndarray]:
@@ -407,7 +412,8 @@ class CMB:
             geom_info = ('healpix', {'nside':self.nside})
             Q, U = lenspyx.alm2lenmap_spin([elm,blm], defl, 2, geometry=geom_info, verbose=int(self.verbose))
             del (elm, blm, defl)
-            hp.write_map(fname, [Q, U], dtype=np.float64)
+            if self.cache:
+                hp.write_map(fname, [Q, U], dtype=np.float64)
             return [Q, U]
         
     def get_QU(self, idx: int) -> List[np.ndarray]:

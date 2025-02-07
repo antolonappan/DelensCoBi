@@ -18,6 +18,7 @@ class Noise:
         self.config = PICO.data
         self.nside = nside
         self.lmax = 3*nside-1
+        self.seeds = np.arange(444444,444444+500, dtype=int)
 
     @property
     def nlev_pol_arr(self):
@@ -55,10 +56,11 @@ class Noise:
         else:
             raise ValueError('unit not recognized')
         
-    def get_EB(self):
+    def get_EB(self,i):
         cl = np.ones(self.lmax+1)*self.depth_p_ilc()
         cl[0] = 0
         cl[1] = 0
+        np.random.seed(self.seeds[i])
         return hp.synalm([cl,cl,cl,cl*0],self.lmax,new=True)[1:]
 
     

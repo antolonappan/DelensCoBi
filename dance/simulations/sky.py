@@ -15,14 +15,20 @@ class Sky:
         beta: Optional[float]=None,
         Acb: Optional[float]=None,
         verbose: Optional[bool] = True,
+        cache: Optional[str] = 'sky',
     ):
-        self.obsdir = os.path.join(libdir,f"obs_N{nside}_m{model}" + f"_b{beta}" if model == "iso" else f"_Acb{Acb}")
+        __extname__ = f"_b{beta}" if model == "iso" else f"_Acb{Acb}"
+        self.obsdir = os.path.join(libdir,f"obs_N{nside}_m{model}" + __extname__)
         if mpi.rank == 0:
             os.makedirs(self.obsdir,exist_ok=True)
-        self.cmb = CMB(libdir,nside,model,beta,Acb,verbose)
+        self.cmb = CMB(libdir,nside,model,beta,Acb,verbose,cache = True if cache == 'all' else False)
         self.noise = Noise(libdir,nside)
         self.nside = nside
         self.lmax = 3*nside-1
+        if cache == 'all' or cache == 'sky':
+            self.cache = True
+        else:
+            self.cache = False
 
     def __get_EB__(self,idx:int):
         e,b = self.cmb.get_EB(idx)
@@ -32,27 +38,36 @@ class Sky:
         return [e,b]
 
     
-    def get_EB(self,idx:int):
+    def get_EB(self,idx:int,E:bool=True,B:bool=True):
         fname = os.path.join(self.obsdir,f"sims_{idx:04d}.fits")
         if os.path.isfile(fname):
-            return hp.read_alms(fname,hdu=[1,2])
+            if E and not B:
+                return hp.read_alm(fname,hdu=1)
+            elif B and not E:
+                return hp.read_alm(fname,hdu=2)
+            else:
+                return [hp.read_alm(fname,hdu=1),hp.read_alm(fname,hdu=2)]
         else:
             se,sb = self.__get_EB__(idx)
-            ne,nb = self.noise.get_EB()
+            ne,nb = self.noise.get_EB(idx)
             eb = [se+ne,sb+nb]
             del (se,sb,ne,nb)
-            hp.write_alm(fname,eb)
-            return eb
+            if self.cache:
+                hp.write_alm(fname,eb)
+            if E and not B:
+                return eb[0]
+            elif B and not E:
+                return eb[1]
+            else:
+                return eb
     
     def get_T(self,idx:int):
         return np.zeros(hp.Alm.getsize(self.lmax),dtype=np.complex64)
     
     def get_E(self,idx:int):
-        fname = os.path.join(self.obsdir,f"sims_{idx:04d}.fits")
-        return hp.read_alms(fname,hdu=1)
+        return self.get_EB(idx,B=False)
 
     def get_B(self,idx:int):
-        fname = os.path.join(self.obsdir,f"sims_{idx:04d}.fits")
-        return hp.read_alms(fname,hdu=2)
+        return self.get_EB(idx,E=False)
     
 
