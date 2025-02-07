@@ -5,8 +5,8 @@ sys.path.append('../')
 from dance.simulations import Sky
 from dance import mpi
 
-basedir = '/mnt/home/alonappan/scratch/DANCE'
-sky = Sky(basedir,2048,'iso',beta=0.35)
+basedir = '/mnt/sdceph/users/alonappan/DANCE'
+sky = Sky(basedir,1024,'iso',beta=0.35)
 
 start_idx = 1
 end_idx = 300
