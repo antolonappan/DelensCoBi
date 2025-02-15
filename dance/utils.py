@@ -153,3 +153,30 @@ def slice_alms(teb, lmax_new):
             return teb_new[0]
         else:
             return teb_new
+        
+def bin_cmb_spectrum(arr, bin_width):
+    """
+    Bins a CMB power spectrum while avoiding the first two multipoles (l=0, l=1).
+
+    Parameters:
+    arr (numpy array): Input CMB power spectrum array.
+    bin_width (int): The width of each bin.
+
+    Returns:
+    tuple: (binned_ells, binned_spectrum) where
+           - binned_ells is an array of the central multipoles in each bin.
+           - binned_spectrum is the averaged power spectrum in each bin.
+    """
+    lmax = len(arr) - 1  # Maximum multipole from the array length
+    ells = np.arange(2, lmax + 1)  # Avoiding l=0, l=1
+
+    binned_ells = []
+    binned_spectrum = []
+
+    for i in range(2, lmax + 1, bin_width):  # Start from l=2
+        bin_range = np.arange(i, min(i + bin_width, lmax + 1))
+        if len(bin_range) > 0:
+            binned_ells.append(np.mean(bin_range))
+            binned_spectrum.append(np.mean(arr[bin_range]))
+
+    return np.array(binned_ells), np.array(binned_spectrum)

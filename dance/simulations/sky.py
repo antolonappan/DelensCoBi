@@ -11,6 +11,8 @@ class Sky:
         self,
         libdir:str,
         nside:int,
+        nlev_p:float,
+        lensed: bool = True,
         model: str = "iso",
         beta: Optional[float]=None,
         Acb: Optional[float]=None,
@@ -18,28 +20,29 @@ class Sky:
         cache: Optional[str] = 'sky',
     ):
         __extname__ = f"_b{beta}" if model == "iso" else f"_Acb{Acb}"
-        self.obsdir = os.path.join(libdir,f"obs_N{nside}_m{model}" + __extname__)
+        self.obsdir = os.path.join(libdir,f"obs_N{nside}_m{model}_n{str(nlev_p)}" + __extname__)
         if mpi.rank == 0:
             os.makedirs(self.obsdir,exist_ok=True)
-        self.cmb = CMB(libdir,nside,model,beta,Acb,verbose,cache = True if cache == 'all' else False)
-        self.noise = Noise(libdir,nside)
+        self.cmb = CMB(libdir,nside,lensed,model,beta,Acb,verbose,cache = True if cache == 'all' else False)
+        self.noise = Noise(nside,nlev_p)
         self.nside = nside
         self.lmax = 3*nside-1
         if cache == 'all' or cache == 'sky':
             self.cache = True
         else:
             self.cache = False
+        self.lensed = lensed
 
     def __get_EB__(self,idx:int):
         e,b = self.cmb.get_EB(idx)
-        bl = hp.gauss_beam(self.noise.fwhm_ilc('rad'),lmax=self.lmax,pol=True).T
+        bl = hp.gauss_beam(self.noise.fwhm('rad'),lmax=self.lmax,pol=True).T
         hp.almxfl(e,bl[1],inplace=True)
         hp.almxfl(b,bl[2],inplace=True)
         return [e,b]
 
     
     def get_EB(self,idx:int,E:bool=True,B:bool=True):
-        fname = os.path.join(self.obsdir,f"sims_{idx:04d}.fits")
+        fname = os.path.join(self.obsdir,f"sims{'' if self.lensed else '_g'}_{idx:04d}.fits")
         if os.path.isfile(fname):
             if E and not B:
                 return hp.read_alm(fname,hdu=1)
