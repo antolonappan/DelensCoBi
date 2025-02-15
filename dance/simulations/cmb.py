@@ -21,6 +21,7 @@ class CMB:
         self,
         libdir: str,
         nside: int,
+        lensed: bool = True,
         model: str = "iso",
         beta: Optional[float]=None,
         Acb: Optional[float]=None,
@@ -29,6 +30,7 @@ class CMB:
     ):
         self.logger = Logger(self.__class__.__name__, verbose=verbose if verbose is not None else False)
         self.basedir = libdir
+        self.lensed = lensed
 
         self.nside  = nside
         self.lmax   = 3 * nside - 1
@@ -363,7 +365,7 @@ class CMB:
         phi_alm = self.phi_alm(idx)
         return hp.almxfl(phi_alm, np.sqrt(np.arange(self.lmax + 1, dtype=float) * np.arange(1, self.lmax + 2)), None, False)
 
-    def get_iso_lensed_QU(self, idx: int) -> List[np.ndarray]:
+    def get_iso_real_lensed_QU(self, idx: int) -> List[np.ndarray]:
         fname = os.path.join(
             self.cmbdir,
             f"sims_nside{self.nside}_{idx:03d}.fits",
@@ -387,6 +389,34 @@ class CMB:
             if self.cache:
                 hp.write_map(fname, [Qlen, Ulen], dtype=np.float64)
             return [Qlen, Ulen]
+    
+    def get_iso_gauss_lensed_QU(self, idx: int) -> List[np.ndarray]:
+        fname = os.path.join(
+            self.cmbdir,
+            f"sims_g_nside{self.nside}_{idx:03d}.fits",
+        )
+        if os.path.isfile(fname) and self.cache:
+            return hp.read_map(fname, field=[0, 1])
+        else:
+            spectra = self.get_cb_lensed_spectra(
+                    beta=self.beta if self.beta is not None else 0.0,
+                    dl=False,
+                )
+            np.random.seed(self.__cseeds__[idx])
+            Q, U = hp.synfast(
+                [spectra["tt"], spectra["ee"], spectra["bb"], spectra["te"], spectra["eb"], spectra["tb"]],
+                nside=self.nside,
+                new=True,
+            )[1:]
+            if self.cache:
+                hp.write_map(fname, [Q, U], dtype=np.float64)
+            return [Q, U]
+
+    def get_iso_lensed_QU(self, idx: int) -> List[np.ndarray]:
+        if self.lensed:
+            return self.get_iso_real_lensed_QU(idx)
+        else:
+            return self.get_iso_gauss_lensed_QU(idx)
     
     def get_aniso_lensed_QU(self, idx: int) -> List[np.ndarray]:
         fname = os.path.join(

@@ -10,12 +10,14 @@ class mysims(object):
         self,
         libdir:str,
         nside:int,
+        nlev_p:float,
+        lensed: bool = True,
         model: str = "iso",
         beta: Optional[float]=None,
         Acb: Optional[float]=None,
         verbose: Optional[bool] = True,
     ):
-        self.sky = Sky(libdir,nside,model,beta,Acb,verbose,cache='sky')
+        self.sky = Sky(libdir,nside,nlev_p,lensed,model,beta,Acb,verbose,cache='sky')
 
     def hashdict(self):
         return {'sim_lib': 'none'}
