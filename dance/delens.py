@@ -10,6 +10,7 @@ from dance import mpi
 import pickle as pl
 from tqdm import tqdm
 from scipy.signal import savgol_filter
+from plancklens import utils
 
 class Delens:
     def __init__(
@@ -32,6 +33,7 @@ class Delens:
         self.basedir = os.path.join(libdir,f"delens_N{nside}_m{model}_n{nlev_p}_ivf{lmin_ivf}_{lmax_ivf}_qlm{lmax_qlm}_delens{lmin_delens}_{lmax_delens}")
         if mpi.rank == 0:
             os.makedirs(self.basedir, exist_ok=True)
+        self.nside = nside
         self.model = model
         self.beta = beta
         self.recon = Reconstruct(libdir,nside,nlev_p,lensed,model,beta,Acb,lmin_ivf,lmax_ivf,lmax_qlm,qe_key,verbose)
@@ -88,6 +90,9 @@ class Delens:
         if bw is not None:
             return bin_cmb_spectrum(cl,bw)
         return cl
+    
+
+
 
         
         

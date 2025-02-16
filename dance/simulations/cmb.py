@@ -345,6 +345,26 @@ class CMB:
                 hp.write_map(fname, alpha, dtype=np.float64)
             return alpha # type: ignore
     
+    def alpha_alm(self, idx: int) -> np.ndarray:
+        """
+        Generate the alpha alm for the anisotropic model.
+
+        Parameters:
+        idx (int): Index for the realization of the CMB map.
+
+        Returns:
+        np.ndarray: The alpha alm as a NumPy array.
+
+        Notes:
+        The method generates the alpha alm for the anisotropic model.
+        The alpha alm is generated as a random realization of the Cl_AA power spectrum.
+        """
+        cl_aa = self.cl_aa()
+        cl_aa[0] = 0
+        np.random.seed(self.__aseeds__[idx])
+        alm = hp.synalm(cl_aa, lmax=self.lmax, new=True)
+        return alm
+    
     def cl_pp(self):
         powers = self.get_power(dl=False)['lens_potential']
         return powers[:, 0]

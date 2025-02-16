@@ -11,6 +11,7 @@ import pickle as pl
 from tqdm import tqdm
 from scipy.signal import savgol_filter
 from dance.utils import bin_cmb_spectrum
+from dance.simulations import delensims
 
 class WienerFilter:
     def __init__(
@@ -25,6 +26,7 @@ class WienerFilter:
         lmin_ivf: Optional[int] = 2,
         lmax_ivf: Optional[int] = 4096,
         verbose: Optional[bool] = True,
+        delens: Optional[Any] = None
     ):
         __extname__ = f"_b{beta}" if model == "iso" else f"_Acb{Acb}"
         self.basedir = os.path.join(libdir,f"filt_N{nside}_m{model}_n{str(nlev_p)}" + __extname__)
@@ -56,8 +58,11 @@ class WienerFilter:
 
         
 
-
-        self.ivfs = filt_simple.library_fullsky_sepTP(self.basedir, sims, nside, transf, cl_len, ftl, fel, fbl,)
+        if delens is None:
+            self.ivfs = filt_simple.library_fullsky_sepTP(self.basedir, sims, nside, transf, cl_len, ftl, fel, fbl,)
+        else:
+            print('Delens Filtering')
+            self.ivfs = filt_simple.library_fullsky_sepTP(self.basedir, delensims(delens), nside, transf, cl_len, ftl, fel, fbl)
 
     def get_wf_E(self,i):
         return self.ivfs.get_sim_emliklm(i)

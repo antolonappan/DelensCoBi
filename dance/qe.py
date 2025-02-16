@@ -29,15 +29,19 @@ class Reconstruct:
         lmax_qlm: Optional[int] = 4096,
         qe_key: Optional[str] = 'p_p',
         verbose: Optional[bool] = True,
+        delens: Optional[Any] = None
     ):
-        wf = WienerFilter(libdir,nside,nlev_p,lensed,model,beta,Acb,lmin_ivf,lmax_ivf,verbose)
+        wf = WienerFilter(libdir,nside,nlev_p,lensed,model,beta,Acb,lmin_ivf,lmax_ivf,verbose,delens)
         self.wf = wf
         self.lensed = lensed
 
         __extname__ = f"_b{beta}" if model == "iso" else f"_Acb{Acb}"
 
         basedir = os.path.join(libdir,f"recon_N{nside}_m{model}_n{nlev_p}" + __extname__)
-        qlmdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}")
+        if delens is None:
+            qlmdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}")
+        else:
+            qlmdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_delens")
         nOdir = os.path.join(basedir,f"n0{'' if lensed else 'gaus'}")
         qrespdir = os.path.join(basedir,f"qresp{'' if lensed else 'gaus'}")
         n1dir = os.path.join(basedir,f"n1")
@@ -77,7 +81,10 @@ class Reconstruct:
         return self.n0.get_sim_nhl(i, self.qe_key, self.qe_key)*self.norm**2
     
     def get_n1(self,i:int):
-        return self.n1.get_n1(self.qe_key,'p',self.wf.cmb.cl_pp(),self.wf.ivfs.get_ftl(),self.wf.ivfs.get_fel(),self.wf.ivfs.get_fbl(),self.lmax_qlm)*self.norm**2
+        if self.source == 'p':
+            return self.n1.get_n1(self.qe_key,'p',self.wf.cmb.cl_pp(),self.wf.ivfs.get_ftl(),self.wf.ivfs.get_fel(),self.wf.ivfs.get_fbl(),self.lmax_qlm)*self.norm**2
+        else:
+            return 0
     
     def get_n0_n1(self,i:int):
         return self.get_n0(i) + self.get_n1(i)
@@ -103,7 +110,10 @@ class Reconstruct:
         return qlm
     
     def get_qlm_th(self,i:int, norm: bool=True, wf: bool=False):
-        slm = slice_alms(self.cmb.phi_alm(i),lmax_new=self.lmax_qlm)
+        if self.source == 'p':
+            slm = slice_alms(self.cmb.phi_alm(i),lmax_new=self.lmax_qlm)
+        else:
+            slm = slice_alms(self.cmb.alpha_alm(i),lmax_new=self.lmax_qlm)
         nlm = hp.synalm(self.get_n0_n1(i))
         qlm = slm + nlm
         del (slm,nlm)
