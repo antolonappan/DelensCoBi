@@ -11,7 +11,7 @@ basedir = '/mnt/sdceph/users/alonappan/DANCE'
 delensed = True
 
 
-start_idx = 90
+start_idx = 1
 end_idx = 100
 
 jobs = arange(start_idx,end_idx)

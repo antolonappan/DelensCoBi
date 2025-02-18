@@ -54,7 +54,7 @@ class Delens:
         lmax = hp.Alm.getlmax(len(qlm))
         return -hp.almxfl(qlm, np.sqrt(np.arange(lmax + 1, dtype=float) * np.arange(1, lmax + 2)), None, False)
 
-    def delens(self,i,th=False):
+    def delens(self,i,th=True):
         fname = os.path.join(self.basedir,f"delens_{'r'if th else 'g'}{'' if self.lensed else 'gaus' }_{i:04d}.fits")
         if os.path.isfile(fname):
             return hp.read_alm(fname,hdu=1), hp.read_alm(fname,hdu=2)
@@ -85,14 +85,9 @@ class Delens:
             return self._delens_cl_(i,th)[:len(t)]/t
         return self._delens_cl_(i,th)
     
-    def delens_cl(self,i,th=False,transfer=False,bw=None):
+    def delens_cl(self,i,th=True,transfer=False,bw=None):
         cl = self._delens_cl_transfer_(i,th,transfer)
         if bw is not None:
             return bin_cmb_spectrum(cl,bw)
         return cl
     
-
-
-
-        
-        
