@@ -54,12 +54,12 @@ class Delens:
         lmax = hp.Alm.getlmax(len(qlm))
         return -hp.almxfl(qlm, np.sqrt(np.arange(lmax + 1, dtype=float) * np.arange(1, lmax + 2)), None, False)
 
-    def delens(self,i,recon=True):
-        fname = os.path.join(self.basedir,f"delens_{'r'if recon else 'g'}{'' if self.lensed else 'gaus' }_{i:04d}.fits")
+    def delens(self,i,th=False):
+        fname = os.path.join(self.basedir,f"delens_{'r'if th else 'g'}{'' if self.lensed else 'gaus' }_{i:04d}.fits")
         if os.path.isfile(fname):
             return hp.read_alm(fname,hdu=1), hp.read_alm(fname,hdu=2)
         else:
-            dlm = self.grad_phi_alm(i,th=recon)
+            dlm = self.grad_phi_alm(i,th)
             e = self.wf.get_wf_E(i)
             b = self.wf.get_wf_B(i)
             
@@ -69,24 +69,24 @@ class Delens:
             hp.write_alm(fname,eb)
             return eb
         
-    def _delens_cl_(self,i,recon=True):
-        fname = os.path.join(self.basedir,f"delenscl_{'r'if recon else 'g'}{'' if self.lensed else 'gaus' }_{i:04d}.pkl")
+    def _delens_cl_(self,i,th=False):
+        fname = os.path.join(self.basedir,f"delenscl_{'r'if th else 'g'}{'' if self.lensed else 'gaus' }_{i:04d}.pkl")
         if os.path.isfile(fname):
             return pl.load(open(fname,'rb'))
         else:
-            e,b = self.delens(i,recon)
+            e,b = self.delens(i,th)
             cl = hp.alm2cl(e,b)
             pl.dump(cl,open(fname,'wb'))
             return cl
     
-    def _delens_cl_transfer_(self,i,recon=True,transfer=False):
+    def _delens_cl_transfer_(self,i,th=False,transfer=False):
         if transfer:
             t = self.wf.get_transfer()
-            return self._delens_cl_(i,recon)[:len(t)]/t
-        return self._delens_cl_(i,recon)
+            return self._delens_cl_(i,th)[:len(t)]/t
+        return self._delens_cl_(i,th)
     
-    def delens_cl(self,i,recon=True,transfer=False,bw=None):
-        cl = self._delens_cl_transfer_(i,recon,transfer)
+    def delens_cl(self,i,th=False,transfer=False,bw=None):
+        cl = self._delens_cl_transfer_(i,th,transfer)
         if bw is not None:
             return bin_cmb_spectrum(cl,bw)
         return cl

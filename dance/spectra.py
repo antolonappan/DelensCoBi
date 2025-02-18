@@ -102,30 +102,34 @@ class Likelihood:
         labels =  ['\\beta']
         return MCSamples(samples=samples, names = names, labels = labels, label='Lensed')
 
-    def get_delensed_samp(self):
+    def get_delensed_samp(self,shift=0.0):
         fname = os.path.join(self.basedir,f"delensed_d{int(self.debias)}_b{self.bw}_l{self.lmax}.pkl")
         if os.path.isfile(fname):
-            samples = pl.load(open(fname,'rb'))
+            samples = pl.load(open(fname,'rb')) + shift
         else:
             pos, nwalkers, ndim = self.get_pos_nwalkers_ndim()
             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.log_probability_delens)
             sampler.run_mcmc(pos, 5000)
-            samples = sampler.get_chain(discard=100, thin=15, flat=True)
+            samples = sampler.get_chain(discard=100, thin=15, flat=True) + shift
             pl.dump(samples,open(fname,'wb'))
         names = ['beta']
         labels =  ['\\beta']
-        return MCSamples(samples=samples, names = names, labels = labels, label='Delensed')
+        return MCSamples(samples=samples, names = names, labels = labels, label=f"{'Delensed(debiased)'if self.debias else 'Delensed(biased)'}")
 
-    def plot_compare(self):
+    def plot_compare(self,shift=0.0,savename=None):
         lsamples = self.get_lensed_samp()
-        dsamples = self.get_delensed_samp()
+        dsamples = self.get_delensed_samp(shift=shift)
+        print('lensed',lsamples.getInlineLatex('beta',limit=1))
+        print('delensed',dsamples.getInlineLatex('beta',limit=1))
         g = plots.get_subplot_plotter(width_inch=4)
         g.triangle_plot([lsamples,dsamples], filled=True)
-        plt.show()
+        plt.axvline(0.35, c='k', ls='--')
+        if savename is not None:
+            plt.savefig(savename,bbox_inches='tight',dpi=300)
 
 class Spectra:
 
-    def __init__(self,libdir,nside,nlevp,model,beta,lmin_ivf,lmax_ivf,lmax_qlm,qe_key,lmin_delens,lmax_delens,debias,bw):
+    def __init__(self,libdir,nside,nlevp,model,beta,lmin_ivf,lmax_ivf,lmax_qlm,qe_key,lmin_delens,lmax_delens,debias,bw,th=False):
         self.delens_r = Delens(libdir,nside,nlevp,True,model,beta=beta,lmin_ivf=lmin_ivf,lmax_ivf=lmax_ivf,lmax_qlm=lmax_qlm,qe_key=qe_key,lmin_delens=lmin_delens,lmax_delens=lmax_delens)
         self.delens_g = Delens(libdir,nside,nlevp,False,model,beta=beta,lmin_ivf=lmin_ivf,lmax_ivf=lmax_ivf,lmax_qlm=lmax_qlm,qe_key=qe_key,lmin_delens=lmin_delens,lmax_delens=lmax_delens)
         
@@ -134,14 +138,14 @@ class Spectra:
         if mpi.rank == 0:
             os.makedirs(self.libdir,exist_ok=True)
 
-        fname_bias = os.path.join(self.libdir,'gauss_bias.pkl')
+        fname_bias = os.path.join(self.libdir,'gauss_bias.pkl' if not th else 'th_bias.pkl')
         if os.path.isfile(fname_bias):
             cl_diff = pl.load(open(fname_bias,'rb'))
         else:
             sky_g = self.delens_g.wf.mysims.sky
             cl_diff = []
             for i in tqdm(range(50)):
-                cl_g = self.delens_g.delens_cl(i)
+                cl_g = self.delens_g.delens_cl(i,th=th)
                 cl_d_g = hp.alm2cl(sky_g.get_E(i),sky_g.get_B(i))
                 cl_diff.append(cl_g - cl_d_g)
             cl_diff = np.array(cl_diff).mean(axis=0)
@@ -161,13 +165,13 @@ class Spectra:
             pl.dump(lens_t,open(fname_lens,'wb'))
         
 
-        fname_delens = os.path.join(self.libdir,'delens.pkl')
+        fname_delens = os.path.join(self.libdir,'delens.pkl' if not th else 'th_delens.pkl')
         if os.path.isfile(fname_delens):
             dlens_t = pl.load(open(fname_delens,'rb'))
         else:
             dlens_t = []
             for i in tqdm(range(100)):
-                cl = self.delens_r.delens_cl(i,recon=True)
+                cl = self.delens_r.delens_cl(i,th=th)
                 dlens_t.append(cl)
             dlens_t = np.array(dlens_t)
             pl.dump(dlens_t,open(fname_delens,'wb'))
@@ -201,7 +205,7 @@ class Spectra:
         self.debias = debias
         self.bw = bw
 
-    def plot_spectra(self):
+    def plot_spectra(self,savename=None):
         plt.figure(figsize=(6,6))
         plt.loglog(self.eb_lens*self.dl,label='Signal',c='k',lw=2,ls='--')
         plt.errorbar(self.blens,self.lens_t_b.mean(axis=0)*self.dll,self.lens_t_b.std(axis=0)*self.dll,fmt='o',ms=10,elinewidth=6,label='Lensed')
@@ -211,11 +215,19 @@ class Spectra:
         plt.xlabel(r'$\ell$',fontsize=20)
         plt.ylabel(r'$\ell(\ell+1)C^{EB}_{\ell}/2\pi$',fontsize=20)
         plt.legend(fontsize=20)
+        if savename is not None:
+            plt.savefig(savename,bbox_inches='tight',dpi=300)
 
-    def plot_peaks(self):
+    def plot_peaks(self, return_arr=False):
         ratio = (self.eb_lens*self.dl) / (self.eb_unlens*self.dl)
         data_ratio = (self.lens_t_b.mean(axis=0)*self.dll) / (self.dlens_t_b.mean(axis=0)*self.dbl)
         std_ratio = np.abs(data_ratio * np.sqrt((self.lens_t_b.std(axis=0)/self.lens_t_b.mean(axis=0))**2 + (self.dlens_t_b.std(axis=0)/self.dlens_t_b.mean(axis=0))**2))
+        if return_arr:
+            d = {}
+            d['ratio'] = ratio
+            d['dratio'] =[self.bdlens,data_ratio]
+            d['dsratio'] = [self.bdlens,data_ratio-std_ratio,data_ratio+std_ratio]
+            return d
         plt.figure(figsize=(6,6))
         plt.plot(ratio,label=r'$C^{EB}_{\ell,lensed}/C^{EB}_{\ell,unlensed}$',c='k',lw=2,ls='--')
         plt.plot(self.bdlens,data_ratio,label=r'$C^{EB}_{\ell,lensed}/C^{EB}_{\ell,delensed}$',c='r',lw=2)
