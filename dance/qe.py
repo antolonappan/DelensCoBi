@@ -40,9 +40,11 @@ class Reconstruct:
         basedir = os.path.join(libdir,f"recon_N{nside}_m{model}_n{nlev_p}" + __extname__)
         if delens is None:
             qlmdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}")
+            nOdir = os.path.join(basedir,f"n0{'' if lensed else 'gaus'}")
         else:
             qlmdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_delens")
-        nOdir = os.path.join(basedir,f"n0{'' if lensed else 'gaus'}")
+            nOdir = os.path.join(basedir,f"n0{'' if lensed else 'gaus'}_delens")
+        
         qrespdir = os.path.join(basedir,f"qresp{'' if lensed else 'gaus'}")
         n1dir = os.path.join(basedir,f"n1")
 
@@ -114,6 +116,7 @@ class Reconstruct:
             slm = slice_alms(self.cmb.phi_alm(i),lmax_new=self.lmax_qlm)
         else:
             slm = slice_alms(self.cmb.alpha_alm(i),lmax_new=self.lmax_qlm)
+        
         nlm = hp.synalm(self.get_n0_n1(i))
         qlm = slm + nlm
         del (slm,nlm)
@@ -123,8 +126,15 @@ class Reconstruct:
     
     def get_qlm(self,i:int, norm: bool=True, wf: bool=False, th: bool=False):
         if th:
+            print('doing theory')
+            #raise ModuleNotFoundError("This function is supressed for now")
             return self.get_qlm_th(i,norm,wf)
         return self.get_qlm_recon(i,norm,wf)
+    
+    def get_qcl(self,i:int, norm: bool=True, wf: bool=False, th: bool=False):
+        qlm = self.get_qlm(i,norm,wf,th)
+        cl = hp.alm2cl(qlm) - self.get_n0(i) - self.get_n1(i)
+        return cl
     
     def plot_qcl(self,i:int, norm: bool=True, wf: bool=False, th: bool=False, which='recon'):
         l = np.arange(self.lmax_qlm + 1)
