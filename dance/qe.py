@@ -25,8 +25,8 @@ class Reconstruct:
         beta: Optional[float]=None,
         Acb: Optional[float]=None,
         lmin_ivf: Optional[int] = 2,
-        lmax_ivf: Optional[int] = 4096,
-        lmax_qlm: Optional[int] = 4096,
+        lmax_ivf: Optional[int] = 2048,
+        lmax_qlm: Optional[int] = 2048,
         qe_key: Optional[str] = 'p_p',
         verbose: Optional[bool] = True,
         delens: Optional[Any] = None
@@ -37,7 +37,7 @@ class Reconstruct:
 
         __extname__ = f"_b{beta}" if model == "iso" else f"_Acb{Acb}"
 
-        basedir = os.path.join(libdir,f"recon_N{nside}_m{model}_n{nlev_p}" + __extname__)
+        basedir = os.path.join(libdir,f"recon_N{nside}_m{model}_n{nlev_p}_{lmin_ivf}{lmax_ivf}{lmax_qlm}" + __extname__)
         if delens is None:
             qlmdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}")
             nOdir = os.path.join(basedir,f"n0{'' if lensed else 'gaus'}")
@@ -89,7 +89,7 @@ class Reconstruct:
             return 0
     
     def get_n0_n1(self,i:int):
-        return self.get_n0(i) + self.get_n1(i)
+        return self.get_n0(i) # + self.get_n1(i)
     
     def get_cl_th(self):
         if self.source == 'p':

@@ -29,7 +29,7 @@ class WienerFilter:
         delens: Optional[Any] = None
     ):
         __extname__ = f"_b{beta}" if model == "iso" else f"_Acb{Acb}"
-        self.basedir = os.path.join(libdir,f"filt_N{nside}_m{model}_n{str(nlev_p)}" + __extname__)
+        self.basedir = os.path.join(libdir,f"filt_N{nside}_m{model}_n{str(nlev_p)}_{lmin_ivf}{lmax_ivf}" + __extname__)
         if mpi.rank == 0:
             os.makedirs(self.basedir, exist_ok=True)
         self.model = model
@@ -79,36 +79,36 @@ class WienerFilter:
             pl.dump(eb, open(fname, "wb"))
             return eb
     
-    def get_wf_EB_trans(self,i,transfer=False):
-        if transfer:
-            return self._get_wf_EB_(i) / self.get_transfer()
-        return self._get_wf_EB_(i)
+    # def get_wf_EB_trans(self,i,transfer=False):
+    #     if transfer:
+    #         return self._get_wf_EB_(i) / self.get_transfer()
+    #     return self._get_wf_EB_(i)
     
-    def get_wf_EB(self,i,transfer=False,bw=None):
-        cl = self.get_wf_EB_trans(i,transfer)
-        if bw is not None:
-            return bin_cmb_spectrum(cl,bw)
-        return cl
+    # def get_wf_EB(self,i,transfer=False,bw=None):
+    #     cl = self.get_wf_EB_trans(i,transfer)
+    #     if bw is not None:
+    #         return bin_cmb_spectrum(cl,bw)
+    #     return cl
         
-    def get_transfer(self):
-        assert self.model == 'iso', 'Only isotropic model is supported'
-        fname = os.path.join(self.basedir, f"transfer.pkl")
-        if os.path.isfile(fname):
-            return pl.load(open(fname, "rb"))
-        else:
-            eb = []
-            for i in tqdm(range(300),desc='Computing Transfer Functions'):
-                eb.append(self.get_wf_EB(i))
-            eb = np.array(eb)
-            eb = np.mean(eb,axis=0)
-            EB = self.cmb.get_cb_lensed_spectra(self.beta,dl=False)['eb']
-            EB = EB[:len(eb)]
-            transfer = eb/EB
-            transfer[np.isnan(transfer)] = 0
-            stransfer = savgol_filter(transfer[2:], window_length=300, polyorder=3)
-            stransfer=np.concatenate(([0, 0], stransfer))
-            pl.dump(stransfer, open(fname, "wb"))
-            return stransfer
+    # def get_transfer(self):
+    #     assert self.model == 'iso', 'Only isotropic model is supported'
+    #     fname = os.path.join(self.basedir, f"transfer.pkl")
+    #     if os.path.isfile(fname):
+    #         return pl.load(open(fname, "rb"))
+    #     else:
+    #         eb = []
+    #         for i in tqdm(range(300),desc='Computing Transfer Functions'):
+    #             eb.append(self.get_wf_EB(i))
+    #         eb = np.array(eb)
+    #         eb = np.mean(eb,axis=0)
+    #         EB = self.cmb.get_cb_lensed_spectra(self.beta,dl=False)['eb']
+    #         EB = EB[:len(eb)]
+    #         transfer = eb/EB
+    #         transfer[np.isnan(transfer)] = 0
+    #         stransfer = savgol_filter(transfer[2:], window_length=300, polyorder=3)
+    #         stransfer=np.concatenate(([0, 0], stransfer))
+    #         pl.dump(stransfer, open(fname, "wb"))
+    #         return stransfer
 
 
 
