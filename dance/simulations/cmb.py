@@ -393,19 +393,17 @@ class CMB:
         if os.path.isfile(fname) and self.cache:
             return hp.read_map(fname, field=[0, 1])
         else:
-            spectra = self.get_cb_unlensed_spectra(
-                    beta=self.beta if self.beta is not None else 0.0,
-                    dl=False,
-                )
+            spectra = self.get_unlensed_spectra(dl=False)
+
             np.random.seed(self.__cseeds__[idx])
-            alms = hp.synalm(
-                [spectra["tt"], spectra["ee"], spectra["bb"], spectra["te"], spectra["eb"], spectra["tb"]],
-                lmax=self.lmax,
-                new=True,
-            )
+            _,elm,blm = hp.synalm([spectra["tt"], spectra["ee"], spectra["bb"], spectra["te"]], lmax=self.lmax, new=True,)
+            alpha = 2*np.deg2rad(self.beta)
+            elm_r =  elm*np.cos(alpha) - blm*np.sin(alpha)
+            blm_r =  blm*np.cos(alpha) + elm*np.sin(alpha)
+            del (elm,blm)
             defl = self.grad_phi_alm(idx)
             geom_info = ('healpix', {'nside':self.nside})
-            Qlen, Ulen = lenspyx.alm2lenmap_spin([alms[1],alms[2]], defl, 2, geometry=geom_info, verbose=int(self.verbose))
+            Qlen, Ulen = lenspyx.alm2lenmap_spin([elm_r,blm_r], defl, 2, geometry=geom_info, verbose=int(self.verbose))
             if self.cache:
                 hp.write_map(fname, [Qlen, Ulen], dtype=np.float64)
             return [Qlen, Ulen]

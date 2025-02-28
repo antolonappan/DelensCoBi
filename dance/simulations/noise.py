@@ -14,9 +14,9 @@ class Noise:
     
     def fwhm(self,unit='arcmin'):
         if unit == 'rad':
-            return np.radians(2/60)
+            return np.radians(1/60)
         elif unit == 'arcmin':
-            return 2
+            return 1
         else:
             raise ValueError('unit not recognized')
         
