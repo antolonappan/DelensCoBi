@@ -56,13 +56,16 @@ class Likelihood:
         self.basedir = delens.basedir
         self.lmax = lmax
         cmb = delens.wf.cmb
+        fwhm = delens.wf.mysims.sky.noise.fwhm(unit='rad')
         theory_lens = cmb.get_lensed_spectra(dl=False)
         ell = np.arange(len(theory_lens['ee']))
+        bl = hp.gauss_beam(fwhm,lmax=len(ell)-1)
     
         if mpi.rank == 0:
             os.makedirs(self.basedir,exist_ok=True)
         self.ee_lens_interp = InterpolatedUnivariateSpline(ell[2:],theory_lens['ee'][2:],k=5)
         self.bb_lens_interp = InterpolatedUnivariateSpline(ell[2:],theory_lens['bb'][2:],k=5)
+        fl = InterpolatedUnivariateSpline(ell[2:],bl[2:],k=5)
 
         data = delens.get_data(debias=debias)
 
@@ -75,6 +78,7 @@ class Likelihood:
         self.lens_eb_std = data['lens'].std(axis=0)[sel]
         self.delens_eb_mean = data['delens'].mean(axis=0)[sel]
         self.delens_eb_std = data['delens'].std(axis=0)[sel]
+        self.fb = fl(self.b)
         self.debias = debias
         if debias:
             self.bias = data['bias'][sel]
@@ -94,13 +98,13 @@ class Likelihood:
     def chi_sq(self,beta,which,debias=False):
         eb = self.theory_eb(beta,self.b)
         if which == 'l':
-            return np.sum((self.lens_eb_mean - eb)**2 / self.lens_eb_std**2)
+            return np.sum((self.lens_eb_mean/self.fb**2 - eb)**2 / self.lens_eb_std**2)
         elif which == 'd':
             if debias:
                 assert self.bias is not None, 'Bias is not available in data'
-                data_eb = self.delens_eb_mean + self.bias
+                data_eb = (self.delens_eb_mean + self.bias)/self.fb**2
             else:
-                data_eb = self.delens_eb_mean
+                data_eb = self.delens_eb_mean/self.fb**2
             return np.sum((data_eb - eb)**2 / self.delens_eb_std**2)
         else:
             raise ValueError('which must be either l or d')
@@ -132,7 +136,7 @@ class Likelihood:
         nwalkers, ndim = pos.shape
         return pos, nwalkers, ndim
 
-    def get_lensed_samp(self):
+    def get_lensed_samp(self,getdist=True):
         fname = os.path.join(self.basedir,f"lensed_l{self.lmax}.pkl")
         if os.path.isfile(fname):
             samples = pl.load(open(fname,'rb'))
@@ -142,11 +146,14 @@ class Likelihood:
             sampler.run_mcmc(pos, 5000, progress=True)
             samples = sampler.get_chain(discard=100, thin=15, flat=True)
             pl.dump(samples,open(fname,'wb'))
-        names = ['beta']
-        labels =  ['\\beta']
-        return MCSamples(samples=samples, names = names, labels = labels, label='Lensed')
+        if getdist:
+            names = ['beta']
+            labels =  ['\\beta']
+            return MCSamples(samples=samples, names = names, labels = labels, label='Lensed')
+        else:
+            return samples
         
-    def get_delensed_samp(self,debias=False):
+    def get_delensed_samp(self,debias=False,getdist=True):
         fname = os.path.join(self.basedir,f"delensed_l{self.lmax}_{int(debias)}.pkl")
         if os.path.isfile(fname):
             samples = pl.load(open(fname,'rb'))
@@ -156,16 +163,19 @@ class Likelihood:
             sampler.run_mcmc(pos, 5000, progress=True)
             samples = sampler.get_chain(discard=100, thin=15, flat=True) 
             pl.dump(samples,open(fname,'wb'))
-        names = ['beta']
-        labels =  ['\\beta']
-        if self.debias:
-            if debias:
-                label = 'Delensed (Debiased)'
+        if getdist:
+            names = ['beta']
+            labels =  ['\\beta']
+            if self.debias:
+                if debias:
+                    label = 'Delensed (Debiased)'
+                else:
+                    label = 'Delensed (Biased)'
             else:
-                label = 'Delensed (Biased)'
+                label = 'Delensed'
+            return MCSamples(samples=samples, names = names, labels = labels, label=label)
         else:
-            label = 'Delensed'
-        return MCSamples(samples=samples, names = names, labels = labels, label=label)
+            return samples
 
     def plot_compare(self):
         ls = self.get_lensed_samp()
