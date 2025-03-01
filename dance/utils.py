@@ -6,6 +6,9 @@ import healpy as hp
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 from sklearn.neighbors import KernelDensity
+import os
+from pathlib import Path
+import pickle as pl
 
 class Logger:
     def __init__(self, name: str, verbose: bool = False):
@@ -395,3 +398,17 @@ def plot_posterior(chains,
     plt.ylim(0.01, 1.3)
     plt.tight_layout()
     plt.show()
+
+
+def get_n0_qe(nlev_p):
+    fname = (Path(__file__).resolve().parent.parent / 'data'/'n0_iter.pkl')
+    if not fname.exists():
+        raise FileNotFoundError(f"File {fname} not found")
+    return pl.load(open(fname,'rb'))[nlev_p][0]
+
+def get_n0_iter(nlev_p):
+    fname = (Path(__file__).resolve().parent.parent / 'data'/'n0_iter.pkl')
+    if not fname.exists():
+        raise FileNotFoundError(f"File {fname} not found")
+    return pl.load(open(fname,'rb'))[nlev_p][1]
+

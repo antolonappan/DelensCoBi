@@ -52,7 +52,7 @@ def compute_delens_spectra(basedir,spec):
 
 class Likelihood:
 
-    def __init__(self,delens,lmax=1000,debias=False):
+    def __init__(self,delens,lmax=1000,debias=False,iter=False):
         self.basedir = delens.basedir
         self.lmax = lmax
         cmb = delens.wf.cmb
@@ -66,8 +66,15 @@ class Likelihood:
         self.ee_lens_interp = InterpolatedUnivariateSpline(ell[2:],theory_lens['ee'][2:],k=5)
         self.bb_lens_interp = InterpolatedUnivariateSpline(ell[2:],theory_lens['bb'][2:],k=5)
         fl = InterpolatedUnivariateSpline(ell[2:],bl[2:],k=5)
+        
 
-        data = delens.get_data(debias=debias)
+        self.fn = ''
+        if delens.special_case:
+            data = delens.get_data_sp(iter)
+            if iter:
+                self.fn = '_i'
+        else:
+            data = delens.get_data(debias=debias)
 
         b = data['b']
 
@@ -154,7 +161,7 @@ class Likelihood:
             return samples
         
     def get_delensed_samp(self,debias=False,getdist=True):
-        fname = os.path.join(self.basedir,f"delensed_l{self.lmax}_{int(debias)}.pkl")
+        fname = os.path.join(self.basedir,f"delensed_l{self.lmax}_{int(debias)}{self.fn}.pkl")
         if os.path.isfile(fname):
             samples = pl.load(open(fname,'rb'))
         else:
