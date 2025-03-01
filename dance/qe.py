@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from dance.utils import slice_alms
 import numpy as np
 from plancklens.n1 import n1
+from dance.utils import get_n0_qe, get_n0_iter
 
 
 
@@ -29,11 +30,13 @@ class Reconstruct:
         lmax_qlm: Optional[int] = 2048,
         qe_key: Optional[str] = 'p_p',
         verbose: Optional[bool] = True,
+        special_case=False,
         delens: Optional[Any] = None
     ):
         wf = WienerFilter(libdir,nside,nlev_p,lensed,model,beta,Acb,lmin_ivf,lmax_ivf,verbose,delens)
         self.wf = wf
         self.lensed = lensed
+        self.nlev_p = nlev_p
 
         __extname__ = f"_b{beta}" if model == "iso" else f"_Acb{Acb}"
 
@@ -73,14 +76,24 @@ class Reconstruct:
 
         self.norm = self.get_norm()
 
+        self.special_case = special_case
+
     
     def get_norm(self):
         qresp = self.qresp.get_response(self.qe_key, self.source)
         qnorm = utils.cli(qresp)
         return qnorm
     
-    def get_n0(self,i:int):
-        return self.n0.get_sim_nhl(i, self.qe_key, self.qe_key)*self.norm**2
+    def get_n0(self,i:int,iter:bool=False):
+        if not self.special_case:
+            return self.n0.get_sim_nhl(i, self.qe_key, self.qe_key)*self.norm**2
+        else:
+            if iter:
+                print('doing iter')
+                return get_n0_iter(self.nlev_p)
+            else:
+                print('doing qe')
+                return get_n0_qe(self.nlev_p)
     
     def get_n1(self,i:int):
         if self.source == 'p':
@@ -88,8 +101,8 @@ class Reconstruct:
         else:
             return 0
     
-    def get_n0_n1(self,i:int):
-        return self.get_n0(i) # + self.get_n1(i)
+    def get_n0_n1(self,i:int,iter:bool=False):
+        return self.get_n0(i,iter) # + self.get_n1(i)
     
     def get_cl_th(self):
         if self.source == 'p':
@@ -97,9 +110,9 @@ class Reconstruct:
         else:
             return self.cmb.cl_aa()[:self.lmax_qlm + 1]
     
-    def get_wf_fl(self,i:int):
+    def get_wf_fl(self,i:int,iter:bool=False):
         cl_th = self.get_cl_th()
-        nl = self.get_n0_n1(i)
+        nl = self.get_n0_n1(i,iter)
         return utils.cli(cl_th + nl)*cl_th
     
     def get_qlm_recon(self,i:int, norm: bool=True, wf: bool=False):
@@ -111,24 +124,24 @@ class Reconstruct:
             return hp.almxfl(qlm,self.norm)
         return qlm
     
-    def get_qlm_th(self,i:int, norm: bool=True, wf: bool=False):
+    def get_qlm_th(self,i:int, norm: bool=True, wf: bool=False, iter:bool=False):
         if self.source == 'p':
             slm = slice_alms(self.cmb.phi_alm(i),lmax_new=self.lmax_qlm)
         else:
             slm = slice_alms(self.cmb.alpha_alm(i),lmax_new=self.lmax_qlm)
         
-        nlm = hp.synalm(self.get_n0_n1(i))
+        nlm = hp.synalm(self.get_n0_n1(i,iter=iter))
         qlm = slm + nlm
         del (slm,nlm)
         if wf:
-            return hp.almxfl(qlm, self.get_wf_fl(i))
+            return hp.almxfl(qlm, self.get_wf_fl(i,iter))
         return qlm
     
-    def get_qlm(self,i:int, norm: bool=True, wf: bool=False, th: bool=False):
+    def get_qlm(self,i:int, norm: bool=True, wf: bool=False, th: bool=False,iter:bool=False):
         if th:
             print('doing theory')
-            #raise ModuleNotFoundError("This function is supressed for now")
-            return self.get_qlm_th(i,norm,wf)
+            return self.get_qlm_th(i,norm,wf,iter)
+        assert not self.special_case, "Special case is not implemented for this function"
         return self.get_qlm_recon(i,norm,wf)
     
     def get_qcl(self,i:int, norm: bool=True, wf: bool=False, th: bool=False):
