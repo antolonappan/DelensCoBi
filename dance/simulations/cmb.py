@@ -37,6 +37,14 @@ class CMB:
 
         self.beta   = beta
         self.Acb    = Acb
+
+        sets = None
+        if len(model.split("_")) > 1:
+            model, sets = model.split("_")
+        self.sets = sets
+
+
+
         assert model in ["iso","aniso"], "model should be 'iso' or 'aniso'"
         self.model  = model
         if self.model == "aniso":
@@ -57,7 +65,11 @@ class CMB:
         Sets the seeds for the simulation.
         """
         nos = 500
-        self.__cseeds__ = np.arange(11111,11111+nos, dtype=int)
+        if self.sets is None:
+            self.__cseeds__ = np.arange(11111,11111+nos, dtype=int)
+        else:
+            self.logger.log(f"Using the set {self.sets} for the simulation", level="info")
+            self.__cseeds__ = np.arange(44444,44444+nos, dtype=int)
         self.__aseeds__ = np.arange(22222,22222+nos, dtype=int)
         self.__pseeds__ = np.arange(33333,33333+nos, dtype=int)
     
@@ -436,7 +448,7 @@ class CMB:
         else:
             return self.get_iso_gauss_lensed_QU(idx)
     
-    def get_aniso_lensed_QU(self, idx: int) -> List[np.ndarray]:
+    def get_aniso_real_lensed_QU(self, idx: int) -> List[np.ndarray]:
         fname = os.path.join(
             self.cmbdir,
             f"sims_nside{self.nside}_{idx:03d}.fits",
@@ -451,11 +463,14 @@ class CMB:
                 nside=self.nside,
                 new=True,
             )[1:]
-            alpha = self.alpha_map(idx)
-            rQ = Q * np.cos(2 * alpha) - U * np.sin(2 * alpha)
-            rU = Q * np.sin(2 * alpha) + U * np.cos(2 * alpha)
-            del (Q, U, alpha)
-            elm, blm = hp.map2alm_spin([rQ, rU], 2)
+            if self.Acb != 0:
+                alpha = self.alpha_map(idx)
+                rQ = Q * np.cos(2 * alpha) - U * np.sin(2 * alpha)
+                rU = Q * np.sin(2 * alpha) + U * np.cos(2 * alpha)
+                del (Q, U, alpha)
+                elm, blm = hp.map2alm_spin([rQ, rU], 2)
+            else:
+                elm, blm = hp.map2alm_spin([Q, U], 2)
             defl = self.grad_phi_alm(idx)
             geom_info = ('healpix', {'nside':self.nside})
             Q, U = lenspyx.alm2lenmap_spin([elm,blm], defl, 2, geometry=geom_info, verbose=int(self.verbose))
@@ -463,6 +478,38 @@ class CMB:
             if self.cache:
                 hp.write_map(fname, [Q, U], dtype=np.float64)
             return [Q, U]
+    
+    def get_aniso_gauss_lensed_QU(self, idx: int) -> List[np.ndarray]:
+        fname = os.path.join(
+            self.cmbdir,
+            f"sims_g_nside{self.nside}_{idx:03d}.fits",
+        )
+        if os.path.isfile(fname):
+            return hp.read_map(fname, field=[0, 1])
+        else:
+            spectra = self.get_lensed_spectra(dl=False)
+            np.random.seed(self.__cseeds__[idx])
+            Q, U = hp.synfast(
+                [spectra["tt"], spectra["ee"], spectra["bb"], spectra["te"]],
+                nside=self.nside,
+                new=True,
+            )[1:]
+            if self.Acb != 0:
+                alpha = self.alpha_map(idx)
+                rQ = Q * np.cos(2 * alpha) - U * np.sin(2 * alpha)
+                rU = Q * np.sin(2 * alpha) + U * np.cos(2 * alpha)
+                del (Q, U, alpha)
+            else:
+                rQ, rU = Q, U
+            if self.cache:
+                hp.write_map(fname, [rQ, rU], dtype=np.float64)
+            return [rQ, rU]
+    
+    def get_aniso_lensed_QU(self, idx: int) -> List[np.ndarray]:
+        if self.lensed:
+            return self.get_aniso_real_lensed_QU(idx)
+        else:
+            return self.get_aniso_gauss_lensed_QU(idx)
         
     def get_QU(self, idx: int) -> List[np.ndarray]:
         if self.model == "iso":
