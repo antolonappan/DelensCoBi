@@ -46,11 +46,13 @@ class mysims(object):
     
 class delensims:
 
-    def __init__(self, delens):
+    def __init__(self, delens,theory=True,iter=False):
         self.delens = delens
-        self.fle = utils.cli(delens.wf.cl_len['ee'][:4097]*delens.wf.ivfs.fel/delens.wf.ivfs.transf['e'])
+        self.sky = delens.wf.mysims.sky
         self.flb = utils.cli(delens.wf.cl_len['bb'][:4097]*delens.wf.ivfs.fbl/delens.wf.ivfs.transf['b'])
         self.lmax = self.delens.nside*3 - 1
+        self.theory = theory
+        self.iter = iter
 
     def hashdict(self):
         return {'sim_lib': 'none'}
@@ -60,13 +62,13 @@ class delensims:
         return np.zeros(hp.Alm.getsize(lmax),dtype=np.complex64)
 
     def get_sim_elm(self,idx):
-        e,b = self.delens.delens(idx)
-        del b
-        return hp.almxfl(e,self.fle)
+        return self.sky.get_E(idx)
 
     def get_sim_blm(self,idx):
-        e,b = self.delens.delens(idx)
-        del e
+        b = self.sky.get_B(idx)
+        btemp = self.delens.Btemp(idx,th=self.theory,iter=self.iter)
+        b = b - btemp
+        del btemp
         return hp.almxfl(b,self.flb)
     
     def get_sim_tmap(self,idx):

@@ -154,7 +154,7 @@ class Reconstruct:
         plt.figure(figsize=(4,4))
         if which == 'recon':
             qlm = self.get_qlm_recon(i,norm,wf)
-            cl = hp.alm2cl(qlm) - self.get_n0(i) - self.get_n1(i)
+            cl = hp.alm2cl(qlm) #- self.get_n0(i) - self.get_n1(i)
             plt.loglog(l**4*cl,label='recon')
         elif which == 'th':
             qlm = self.get_qlm_th(i,norm,wf)

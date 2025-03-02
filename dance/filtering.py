@@ -62,6 +62,7 @@ class WienerFilter:
             self.ivfs = filt_simple.library_fullsky_sepTP(self.basedir, sims, nside, transf, cl_len, ftl, fel, fbl,)
         else:
             print('Delens Filtering')
+            self.mysims = delensims(delens)
             self.ivfs = filt_simple.library_fullsky_sepTP(self.basedir, delensims(delens), nside, transf, cl_len, ftl, fel, fbl)
 
     def get_wf_E(self,i):
