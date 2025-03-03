@@ -6,7 +6,7 @@ from dance import mpi
 from typing import Dict, Optional, Any, Union, List
 import os
 from plancklens import utils
-from plancklens.filt import filt_simple
+from plancklens.filt import filt_simple, filt_util
 import pickle as pl
 from tqdm import tqdm
 from scipy.signal import savgol_filter
@@ -26,7 +26,8 @@ class WienerFilter:
         lmin_ivf: Optional[int] = 2,
         lmax_ivf: Optional[int] = 4096,
         verbose: Optional[bool] = True,
-        delens: Optional[Any] = None
+        delens: Optional[Any] = None,
+        delens_pairs: Optional[Any] = None
     ):
         __extname__ = f"_b{beta}" if model == "iso" else f"_Acb{Acb}"
         self.basedir = os.path.join(libdir,f"filt_N{nside}_m{model}_n{str(nlev_p)}_{lmin_ivf}{lmax_ivf}" + __extname__)
@@ -36,6 +37,8 @@ class WienerFilter:
         self.beta = beta
         sims = mysims(libdir,nside,nlev_p,lensed,model,beta,Acb,verbose)
         self.mysims = sims
+        pairsim = mysims(libdir,nside,nlev_p,lensed,model+"_b",beta,Acb,verbose)
+        self.pairsim = pairsim
         self.cmb = CMB(libdir,nside,lensed,model,beta,Acb,verbose)
         noise = Noise(nside,nlev_p)
 
@@ -60,10 +63,14 @@ class WienerFilter:
 
         if delens is None:
             self.ivfs = filt_simple.library_fullsky_sepTP(self.basedir, sims, nside, transf, cl_len, ftl, fel, fbl,)
+            self.pairivfs = filt_simple.library_fullsky_sepTP(self.basedir, pairsim, nside, transf, cl_len, ftl, fel, fbl)
         else:
             print('Delens Filtering')
             self.mysims = delensims(delens)
             self.ivfs = filt_simple.library_fullsky_sepTP(self.basedir, delensims(delens), nside, transf, cl_len, ftl, fel, fbl)
+            self.pairivfs = filt_simple.library_fullsky_sepTP(self.basedir, delensims(delens), nside, transf, cl_len, ftl, fel, fbl) # Not using now, but can be used in future for MCN1 for delensed sims
+        
+        self.ivfs_cyclic = filt_util.library_shuffle(self.ivfs,{i: (i + 1) % 100 for i in range(100)})
 
     def get_wf_E(self,i):
         return self.ivfs.get_sim_emliklm(i)
@@ -71,14 +78,14 @@ class WienerFilter:
     def get_wf_B(self,i):
         return self.ivfs.get_sim_bmliklm(i)
     
-    def _get_wf_EB_(self,i):
-        fname = os.path.join(self.basedir, f"eb_cl_{i:04d}.pkl")
-        if os.path.isfile(fname):
-            return pl.load(open(fname, "rb"))
-        else:
-            eb = hp.alm2cl(self.ivfs.get_sim_emliklm(i), self.ivfs.get_sim_bmliklm(i))
-            pl.dump(eb, open(fname, "wb"))
-            return eb
+    # def _get_wf_EB_(self,i):
+    #     fname = os.path.join(self.basedir, f"eb_cl_{i:04d}.pkl")
+    #     if os.path.isfile(fname):
+    #         return pl.load(open(fname, "rb"))
+    #     else:
+    #         eb = hp.alm2cl(self.ivfs.get_sim_emliklm(i), self.ivfs.get_sim_bmliklm(i))
+    #         pl.dump(eb, open(fname, "wb"))
+    #         return eb
     
     # def get_wf_EB_trans(self,i,transfer=False):
     #     if transfer:

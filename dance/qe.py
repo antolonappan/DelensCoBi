@@ -43,9 +43,13 @@ class Reconstruct:
         basedir = os.path.join(libdir,f"recon_N{nside}_m{model}_n{nlev_p}_{lmin_ivf}{lmax_ivf}{lmax_qlm}" + __extname__)
         if delens is None:
             qlmdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}")
+            qlmcyclicdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_cyclic")
+            qlmpairdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_pair")
             nOdir = os.path.join(basedir,f"n0{'' if lensed else 'gaus'}")
         else:
             qlmdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_delens")
+            qlmcyclicdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_delens_cyclic")
+            qlmpairdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_delens_pair")
             nOdir = os.path.join(basedir,f"n0{'' if lensed else 'gaus'}_delens")
         
         qrespdir = os.path.join(basedir,f"qresp{'' if lensed else 'gaus'}")
@@ -55,6 +59,8 @@ class Reconstruct:
         cl_weight['bb'] *= 0
 
         self.qlms= qest.library_sepTP(qlmdir, wf.ivfs, wf.ivfs,   wf.cl_len['te'], nside, lmax_qlm=lmax_qlm)
+        self.qlms_cyclic = qest.library_sepTP(qlmcyclicdir, wf.ivfs, wf.ivfs_cyclic,   wf.cl_len['te'], nside, lmax_qlm=lmax_qlm)
+        self.qlms_pair = qest.library_sepTP(qlmpairdir, wf.ivfs, wf.pairivfs,   wf.cl_len['te'], nside, lmax_qlm=lmax_qlm)
         self.n0 = nhl.nhl_lib_simple(nOdir, wf.ivfs, cl_weight, lmax_qlm)
         self.n1 = n1.library_n1(n1dir,wf.cl_len['tt'],wf.cl_len['te'],wf.cl_len['ee'])
 
@@ -115,8 +121,15 @@ class Reconstruct:
         nl = self.get_n0_n1(i,iter)
         return utils.cli(cl_th + nl)*cl_th
     
-    def get_qlm_recon(self,i:int, norm: bool=True, wf: bool=False):
-        qlm = self.qlms.get_sim_qlm(self.qe_key,i)
+    def get_qlm_recon(self,i:int, norm: bool=True, wf: bool=False,which='self'):
+        if which == 'cyclic':
+            qlm = self.qlms_cyclic.get_sim_qlm(self.qe_key,i)
+        elif which == 'pair':
+            qlm = self.qlms_pair.get_sim_qlm(self.qe_key,i)
+        elif which == 'self':
+            qlm = self.qlms.get_sim_qlm(self.qe_key,i)
+        else:
+            raise ValueError("which must be either 'cyclic', 'pair' or 'self'")
         if wf:
             hp.almxfl(qlm, self.norm, inplace=True)
             return hp.almxfl(qlm, self.get_wf_fl(i))
@@ -154,7 +167,7 @@ class Reconstruct:
         plt.figure(figsize=(4,4))
         if which == 'recon':
             qlm = self.get_qlm_recon(i,norm,wf)
-            cl = hp.alm2cl(qlm) #- self.get_n0(i) - self.get_n1(i)
+            cl = hp.alm2cl(qlm) - self.get_n0(i) #- self.get_n1(i)
             plt.loglog(l**4*cl,label='recon')
         elif which == 'th':
             qlm = self.get_qlm_th(i,norm,wf)
