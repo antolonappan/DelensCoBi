@@ -12,11 +12,15 @@ end_idx = 100
 
 jobs = arange(start_idx,end_idx)
 
-recon = Reconstruct(basedir,2048,1,model='aniso',Acb=1e-6,lmin_ivf=2,lmax_ivf=1024,lmax_qlm=1024,qe_key='a_p',verbose=1)
+recon = Reconstruct(basedir,2048,1,lensed=False,model='aniso',Acb=1e-6,lmin_ivf=2,lmax_ivf=1024,lmax_qlm=1024,qe_key='a_p',verbose=1)
 
 mpi.barrier()
 for i in jobs[mpi.rank::mpi.size]:
     print(f"Rank {mpi.rank} is working on job {i}")
-    eb = recon.get_qcl(i)
+    #eb = recon.get_qcl(i)
+    eb = recon.get_qlm_recon(i,which='self')
+    eb = recon.get_n0(i)
+    eb = recon.get_qlm_recon(i,which='cyclic')
+    eb = recon.get_qlm_recon(i,which='pair')
     del eb
 mpi.barrier()

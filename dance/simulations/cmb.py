@@ -500,6 +500,7 @@ class CMB:
                 rU = Q * np.sin(2 * alpha) + U * np.cos(2 * alpha)
                 del (Q, U, alpha)
             else:
+                self.logger.log("Acb is zero, no rotation applied", level="info")
                 rQ, rU = Q, U
             if self.cache:
                 hp.write_map(fname, [rQ, rU], dtype=np.float64)
