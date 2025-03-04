@@ -412,3 +412,197 @@ def get_n0_iter(nlev_p):
         raise FileNotFoundError(f"File {fname} not found")
     return pl.load(open(fname,'rb'))[nlev_p][1]
 
+
+
+# def bin_power_spectrum(numb_of_bins, cl_arr, option='linear'):
+#     """
+#     Bin a power spectrum array with specified number of bins and spacing option.
+    
+#     Parameters:
+#     - numb_of_bins: Integer number of bins
+#     - cl_arr: Input power spectrum array (1D, 2D, or 3D)
+#     - option: Binning type ('linear', 'log', 'log10', 'sqrt', 'cubic')
+    
+#     Returns:
+#     - binned_arr: Binned spectrum (shape depends on input dimensions)
+#     - bin_centers: Centers of the bins
+    
+#     Raises:
+#     - ValueError: If inputs are invalid (e.g., non-integer bins, invalid option, array too short)
+#     """
+#     # Input validation
+#     if not isinstance(numb_of_bins, int):
+#         raise ValueError("Number of bins must be an integer")
+#     if not isinstance(option, str):
+#         raise ValueError("Binning option must be a string")
+#     if option not in ['linear', 'log', 'log10', 'sqrt', 'cubic']:
+#         raise ValueError(f"Unknown binning option: {option}")
+
+#     # Define multipole range
+#     lmin = 2  # Hardcoded minimum multipole
+#     lmax = cl_arr.shape[-1] - 1  # lmax from array length (assumes ell starts at 0)
+#     if lmax < lmin:
+#         raise ValueError("Array too short: lmax < lmin=2")
+
+#     # Trim array to start at lmin=2
+#     trimmed_arr = cl_arr[..., 2:] if cl_arr.ndim > 1 else cl_arr[2:]
+#     trimmed_length = lmax - lmin + 1
+
+#     # Compute bin edges based on option
+#     if option == 'linear':
+#         step = (lmax - lmin) / numb_of_bins
+#         edges = np.array([lmin + step * i for i in range(numb_of_bins + 1)])
+    
+#     elif option == 'log':
+#         if lmin <= 0:
+#             raise ValueError("lmin must be positive for log spacing")
+#         step = np.log(lmax / lmin) / numb_of_bins
+#         edges = np.array([lmin * np.exp(step * i) for i in range(numb_of_bins + 1)])
+    
+#     elif option == 'log10':
+#         if lmin <= 0:
+#             raise ValueError("lmin must be positive for log10 spacing")
+#         step = np.log10(lmax / lmin) / numb_of_bins
+#         edges = np.array([lmin * 10 ** (step * i) for i in range(numb_of_bins + 1)])
+    
+#     elif option == 'sqrt':
+#         sqrt_min, sqrt_max = np.sqrt(lmin), np.sqrt(lmax)
+#         step = (sqrt_max - sqrt_min) / numb_of_bins
+#         edges = np.array([(sqrt_min + step * i) ** 2 for i in range(numb_of_bins + 1)])
+    
+#     elif option == 'cubic':
+#         cube_min, cube_max = lmin ** (1/3), lmax ** (1/3)
+#         step = (cube_max - cube_min) / numb_of_bins
+#         edges = np.array([(cube_min + step * i) ** 3 for i in range(numb_of_bins + 1)])
+
+#     # Compute bin centers
+#     bin_centers = (edges[:-1] + edges[1:]) / 2
+
+#     # Bin the spectrum
+#     def bin_core(arr):
+#         binned = np.zeros(numb_of_bins)
+#         for i in range(numb_of_bins):
+#             start = int(edges[i]) - lmin  # Adjust for trimmed array
+#             end = int(edges[i + 1]) - lmin
+#             if start < trimmed_length and end <= trimmed_length:
+#                 slice_data = arr[start:end] if end > start else arr[start:start+1]
+#                 binned[i] = np.mean(slice_data) if slice_data.size > 0 else 0
+#         return binned
+
+#     # Handle different input dimensions
+#     if cl_arr.ndim == 1:
+#         binned_arr = bin_core(trimmed_arr)
+    
+#     elif cl_arr.ndim == 2:
+#         binned_arr = np.array([bin_core(trimmed_arr[i]) for i in range(cl_arr.shape[0])])
+    
+#     elif cl_arr.ndim == 3:
+#         binned_arr = np.array([[bin_core(trimmed_arr[i, j]) 
+#                                 for j in range(cl_arr.shape[1])] 
+#                                for i in range(cl_arr.shape[0])])
+    
+#     else:
+#         raise ValueError("Input array must be 1D, 2D, or 3D")
+
+#     return bin_centers,binned_arr
+
+
+def bin_power_spectrum(numb_of_bins, cl_arr, option='linear'):
+    """
+    Bin a power spectrum array with specified number of bins and spacing option,
+    preserving total power using mode weighting (2l + 1).
+    
+    Parameters:
+    - numb_of_bins: Integer number of bins
+    - cl_arr: Input power spectrum array (1D, 2D, or 3D)
+    - option: Binning type ('linear', 'log', 'log10', 'sqrt', 'cubic')
+    
+    Returns:
+    - bin_centers: Mode-weighted centers of the bins
+    - binned_arr: Binned spectrum (shape depends on input dimensions)
+    
+    Raises:
+    - ValueError: If inputs are invalid
+    """
+    # Input validation
+    if not isinstance(numb_of_bins, int):
+        raise ValueError("Number of bins must be an integer")
+    if not isinstance(option, str):
+        raise ValueError("Binning option must be a string")
+    if option not in ['linear', 'log', 'log10', 'sqrt', 'cubic']:
+        raise ValueError(f"Unknown binning option: {option}")
+
+    # Define multipole range
+    lmin = 2
+    input_length = cl_arr.shape[-1]
+    if input_length <= lmin:
+        raise ValueError("Array too short: length <= lmin=2")
+
+    # Trim array to start at lmin=2
+    trimmed_arr = cl_arr[..., 2:] if cl_arr.ndim > 1 else cl_arr[2:]
+    trimmed_length = trimmed_arr.shape[-1]
+    lmax = lmin + trimmed_length - 1  # Correct lmax based on trimmed length
+    ell = np.arange(lmin, lmax + 1)  # Align ell with trimmed_arr
+
+    # Compute bin edges based on option
+    if option == 'linear':
+        edges = np.linspace(lmin, lmax, numb_of_bins + 1)
+    elif option == 'log':
+        if lmin <= 0:
+            raise ValueError("lmin must be positive for log spacing")
+        edges = np.logspace(np.log10(lmin), np.log10(lmax), numb_of_bins + 1)
+    elif option == 'log10':
+        if lmin <= 0:
+            raise ValueError("lmin must be positive for log10 spacing")
+        edges = np.logspace(np.log10(lmin), np.log10(lmax), numb_of_bins + 1)
+    elif option == 'sqrt':
+        sqrt_min, sqrt_max = np.sqrt(lmin), np.sqrt(lmax)
+        edges = np.linspace(sqrt_min, sqrt_max, numb_of_bins + 1) ** 2
+    elif option == 'cubic':
+        cube_min, cube_max = lmin ** (1/3), lmax ** (1/3)
+        edges = np.linspace(cube_min, cube_max, numb_of_bins + 1) ** 3
+
+    edges = np.round(edges).astype(int)
+    edges = np.clip(edges, lmin, lmax)
+    edges = np.unique(edges)
+    if len(edges) < 2:
+        raise ValueError("Too few unique bin edges after rounding")
+
+    # Compute mode weights
+    weights = 2 * ell + 1
+
+    # Bin the spectrum with mode weighting
+    def bin_core(arr):
+        binned = np.zeros(len(edges) - 1)
+        bin_centers = np.zeros(len(edges) - 1)
+        for i in range(len(edges) - 1):
+            start = edges[i]
+            end = edges[i + 1]
+            mask = (ell >= start) & (ell < end)
+            if np.any(mask):
+                slice_data = arr[mask]
+                slice_weights = weights[mask]
+                binned[i] = np.sum(slice_data * slice_weights) / np.sum(slice_weights)
+                bin_centers[i] = np.sum(ell[mask] * slice_weights) / np.sum(slice_weights)
+            else:
+                binned[i] = 0
+                bin_centers[i] = (start + end - 1) / 2
+        return binned, bin_centers
+
+    # Handle different input dimensions
+    if cl_arr.ndim == 1:
+        binned_arr, bin_centers = bin_core(trimmed_arr)
+    elif cl_arr.ndim == 2:
+        results = [bin_core(trimmed_arr[i]) for i in range(cl_arr.shape[0])]
+        binned_arr = np.array([r[0] for r in results])
+        bin_centers = results[0][1]
+    elif cl_arr.ndim == 3:
+        results = [[bin_core(trimmed_arr[i, j]) 
+                    for j in range(cl_arr.shape[1])] 
+                   for i in range(cl_arr.shape[0])]
+        binned_arr = np.array([[r[0] for r in row] for row in results])
+        bin_centers = results[0][0][1]
+    else:
+        raise ValueError("Input array must be 1D, 2D, or 3D")
+
+    return bin_centers, binned_arr
