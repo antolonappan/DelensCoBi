@@ -46,7 +46,7 @@ class mysims(object):
     
 class delensims:
 
-    def __init__(self, delens,theory=True,iter=False):
+    def __init__(self, delens,theory=False,iter=False):
         self.delens = delens
         self.sky = delens.wf.mysims.sky
         self.flb = utils.cli(delens.wf.cl_len['bb'][:4097]*delens.wf.ivfs.fbl/delens.wf.ivfs.transf['b'])

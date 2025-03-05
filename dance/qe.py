@@ -46,11 +46,14 @@ class Reconstruct:
             qlmcyclicdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_cyclic")
             qlmpairdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_pair")
             nOdir = os.path.join(basedir,f"n0{'' if lensed else 'gaus'}")
+            self.delenssp = False
         else:
-            qlmdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_delens")
-            qlmcyclicdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_delens_cyclic")
-            qlmpairdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_delens_pair")
-            nOdir = os.path.join(basedir,f"n0{'' if lensed else 'gaus'}_delens")
+            nename = '' if delens.special_case else '_ne'
+            qlmdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_delens" + nename)
+            qlmcyclicdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_delens_cyclic" + nename)
+            qlmpairdir = os.path.join(basedir,f"qlm{'' if lensed else 'gaus'}_delens_pair" + nename)
+            nOdir = os.path.join(basedir,f"n0{'' if lensed else 'gaus'}_delens" + nename)
+            self.delenssp = delens.special_case
         
         qrespdir = os.path.join(basedir,f"qresp{'' if lensed else 'gaus'}")
         n1dir = os.path.join(basedir,f"n1")
