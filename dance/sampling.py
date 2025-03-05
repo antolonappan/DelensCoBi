@@ -52,7 +52,7 @@ def compute_delens_spectra(basedir,spec):
 
 class Likelihood:
 
-    def __init__(self,delens,lmax=1000,debias=False,iter=False):
+    def __init__(self,delens,lmax=1000,debias=False,iter=False,gauss=False):
         self.basedir = delens.basedir
         self.lmax = lmax
         cmb = delens.wf.cmb
@@ -67,6 +67,9 @@ class Likelihood:
         self.bb_lens_interp = InterpolatedUnivariateSpline(ell[2:],theory_lens['bb'][2:],k=5)
         fl = InterpolatedUnivariateSpline(ell[2:],bl[2:],k=5)
         
+        if gauss:
+            assert debias, 'Gaussian delensing requires debiasing'
+        self.gauss = gauss
 
         self.fn = ''
         if delens.special_case:
@@ -83,8 +86,12 @@ class Likelihood:
         self.b = b[sel]
         self.lens_eb_mean = data['lens'].mean(axis=0)[sel]
         self.lens_eb_std = data['lens'].std(axis=0)[sel]
-        self.delens_eb_mean = data['delens'].mean(axis=0)[sel]
-        self.delens_eb_std = data['delens'].std(axis=0)[sel]
+        if self.gauss:
+            self.delens_eb_mean = data['delens_theory'].mean(axis=0)[sel]
+            self.delens_eb_std = data['delens_theory'].std(axis=0)[sel]
+        else:
+            self.delens_eb_mean = data['delens'].mean(axis=0)[sel]
+            self.delens_eb_std = data['delens'].std(axis=0)[sel]
         self.fb = fl(self.b)
         self.debias = debias
         if debias:
@@ -161,7 +168,7 @@ class Likelihood:
             return samples
         
     def get_delensed_samp(self,debias=False,getdist=True):
-        fname = os.path.join(self.basedir,f"delensed_l{self.lmax}_{int(debias)}{self.fn}.pkl")
+        fname = os.path.join(self.basedir,f"delensed_l{self.lmax}_{int(debias)}{self.fn}{'_g' if self.gauss else ''}.pkl")
         if os.path.isfile(fname):
             samples = pl.load(open(fname,'rb'))
         else:
