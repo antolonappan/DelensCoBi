@@ -49,7 +49,7 @@ class Data:
 
     @property
     def url(self) -> str:
-        return f"https://github.com/antolonappan/dance/releases/download/v0.1-pre/{self.filename}"
+        return f"https://github.com/antolonappan/DelensCoBi/releases/download/v0.1-pre/{self.filename}"
     
     
 
